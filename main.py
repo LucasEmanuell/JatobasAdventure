@@ -10,12 +10,13 @@ from game.entities import Player, Enemy
 from game.levels import GameLevel, Sign
 from game.title import TitleScreen 
 from game.difficulty import DifficultyScreen
+from game.highscore import HighScoreManager 
 from core.rasterizer import Rasterizer
 
 # --- CONFIGURAÇÕES GERAIS ---
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
-LEVEL_WIDTH = 4000 # Definimos um valor padrão para evitar o erro inicial
+LEVEL_WIDTH = 4000
 
 def draw_sign_labels(renderer, camera, level, font):
     for deco in level.decorations:
@@ -51,8 +52,14 @@ def draw_hearts(renderer, player):
         ]
         Rasterizer.scanline_fill(renderer.screen, heart_shape, color)
 
+def draw_score(renderer, player, font):
+    score_text = f"SCORE: {player.score:06d}"
+    shadow = font.render(score_text, True, (0, 0, 0))
+    renderer.screen.blit(shadow, (SCREEN_WIDTH - 248, 28))
+    text = font.render(score_text, True, (255, 255, 100))
+    renderer.screen.blit(text, (SCREEN_WIDTH - 250, 26))
+
 def start_level(level_number, difficulty_hearts, sky_texture, old_player=None):
-    # Passamos a textura do céu para o level
     level = GameLevel(level_number, SCREEN_HEIGHT, sky_texture=sky_texture)
     
     if old_player:
@@ -61,7 +68,11 @@ def start_level(level_number, difficulty_hearts, sky_texture, old_player=None):
         player.health = min(player.health + 20, player.max_health)
     else:
         hp_total = difficulty_hearts * 20
-        player = Player(100, 500, max_hp=hp_total)
+        multiplier = 1.0
+        if difficulty_hearts == 5: multiplier = 1.5
+        elif difficulty_hearts <= 3: multiplier = 3.0
+            
+        player = Player(100, 500, max_hp=hp_total, score_multiplier=multiplier)
         
     enemies = level.spawn_entities()
     return player, enemies, level
@@ -70,31 +81,28 @@ def main():
     pygame.init()
     pygame.font.init() 
 
-    # --- FONTES ---
     try:
         font_gameover = pygame.font.SysFont('impact', 60)
         font_info = pygame.font.SysFont('arial', 30, bold=True)
         font_sign = pygame.font.SysFont('arial', 20, bold=True)
+        font_score = pygame.font.SysFont('consolas', 28, bold=True) 
     except:
         font_gameover = pygame.font.Font(None, 70)
         font_info = pygame.font.Font(None, 40)
         font_sign = pygame.font.Font(None, 25)
+        font_score = pygame.font.Font(None, 35)
 
     renderer = Renderer(SCREEN_WIDTH, SCREEN_HEIGHT)
-    
     camera = Camera(LEVEL_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT)
-    
     input_sys = InputHandler()
     clock = pygame.time.Clock()
     
-    # --- CARREGA RECURSOS 
     assets_loader = AssetsLoader()
-    # Tenta carregar a textura do céu 
-    # Se não existir, o AssetsLoader retorna None e o level usa cor sólida (fallback)
     sky_texture = assets_loader.load_texture("assets/textures/sky.png")
     
     title_screen = TitleScreen(SCREEN_WIDTH, SCREEN_HEIGHT)
     difficulty_screen = DifficultyScreen(SCREEN_WIDTH, SCREEN_HEIGHT)
+    hs_manager = HighScoreManager("scores.json")
     
     GAME_STATE = "MENU"
     
@@ -104,6 +112,9 @@ def main():
     player = None
     enemies = []
     level = None
+    
+    player_name_input = ""
+    blink_cursor = 0
 
     running = True
 
@@ -113,7 +124,7 @@ def main():
 
         running = input_sys.update()
         
-        # --- MENU ---
+        # --- MENU PRINCIPAL ---
         if GAME_STATE == "MENU":
             if input_sys.was_key_just_pressed(pygame.K_RETURN):
                 GAME_STATE = "DIFFICULTY"
@@ -122,7 +133,7 @@ def main():
             title_screen.draw_dynamic(renderer)
             pygame.display.flip()
 
-        # --- DIFICULDADE ---
+        # --- SELEÇÃO DE DIFICULDADE ---
         elif GAME_STATE == "DIFFICULTY":
             renderer.screen.fill((0,0,0))
             confirm_selection = False
@@ -139,24 +150,20 @@ def main():
             if confirm_selection:
                 current_difficulty_hearts = difficulty_screen.get_selected_hearts()
                 current_level_num = 1 
-                
-                # Inicia o jogo passando a textura do céu
                 player, enemies, level = start_level(current_level_num, current_difficulty_hearts, sky_texture)
                 camera = Camera(level.width, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT)
-                
                 GAME_STATE = "GAME"
                 renderer.screen.fill((0,0,0))
             
             difficulty_screen.draw(renderer)
             renderer.render_step()
 
-        # --- JOGO ---
+        # --- LOOP DO JOGO ---
         elif GAME_STATE == "GAME":
             if not player.is_dead:
                 player.update(dt, input_sys, enemies)
                 camera.follow(player)
                 
-                # Fim da fase?
                 if player.pos[0] > level.width + 100:
                     current_level_num += 1
                     if current_level_num > 3:
@@ -169,13 +176,23 @@ def main():
                 for enemy in enemies:
                     enemy.update(dt, player)
             else:
-                if input_sys.was_key_just_pressed(pygame.K_r):
-                    player, enemies, level = start_level(current_level_num, current_difficulty_hearts, sky_texture)
-                    camera = Camera(level.width, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT)
+                # --- GAME OVER LOGIC (ALTERADA) ---
+                if input_sys.was_key_just_pressed(pygame.K_r) or input_sys.was_key_just_pressed(pygame.K_RETURN):
+                    if player.score > 0:
+                        # Se tem pontos, deixa salvar
+                        player_name_input = "" 
+                        GAME_STATE = "INPUT_NAME" 
+                    else:
+                        # Se não tem pontos, vai direto pro menu (e limpa título)
+                        GAME_STATE = "MENU"
+                        title_screen.reset()
+                    
+                    renderer.screen.fill((0,0,0)) 
+                
                 if input_sys.was_key_just_pressed(pygame.K_ESCAPE):
                     GAME_STATE = "MENU"
                     title_screen.reset()
-                    renderer.screen.fill((0,0,0))
+                    renderer.screen.fill((0,0,0)) 
 
             if input_sys.is_key_pressed(pygame.K_z): camera.set_zoom(1.5)
             elif input_sys.is_key_pressed(pygame.K_x): camera.set_zoom(1.0)
@@ -193,6 +210,7 @@ def main():
             if not player.is_dead:
                 draw_hearts(renderer, player)
                 draw_sign_labels(renderer, camera, level, font_sign)
+                draw_score(renderer, player, font_score)
             
             if player.is_dead:
                 overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
@@ -200,36 +218,101 @@ def main():
                 renderer.screen.blit(overlay, (0,0))
                 
                 go_surf = font_gameover.render("GAME OVER", True, (255, 50, 50))
-                go_rect = go_surf.get_rect(center=(SCREEN_WIDTH//2, 250))
+                go_rect = go_surf.get_rect(center=(SCREEN_WIDTH//2, 200))
                 renderer.screen.blit(go_surf, go_rect)
 
-                restart_surf = font_info.render("PRESSIONE R PARA TENTAR NOVAMENTE", True, (200, 200, 200))
-                restart_rect = restart_surf.get_rect(center=(SCREEN_WIDTH//2, 350))
-                renderer.screen.blit(restart_surf, restart_rect)
+                final_score_surf = font_info.render(f"SCORE FINAL: {player.score}", True, (255, 255, 100))
+                renderer.screen.blit(final_score_surf, final_score_surf.get_rect(center=(SCREEN_WIDTH//2, 300)))
+
+                # --- TEXTO DINÂMICO BASEADO NO SCORE ---
+                if player.score > 0:
+                    msg = "PRESSIONE [ENTER] PARA REGISTRAR"
+                else:
+                    msg = "PRESSIONE [ENTER] PARA SAIR"
+                
+                cont_surf = font_info.render(msg, True, (200, 200, 200))
+                renderer.screen.blit(cont_surf, cont_surf.get_rect(center=(SCREEN_WIDTH//2, 400)))
 
             renderer.render_step()
 
-        # --- VITÓRIA ---
+        # --- TELA DE VITÓRIA ---
         elif GAME_STATE == "VICTORY":
             renderer.screen.fill((20, 20, 50))
             
             vic_surf = font_gameover.render("VOCÊ CHEGOU EM CASA!", True, (100, 255, 100))
-            vic_rect = vic_surf.get_rect(center=(SCREEN_WIDTH//2, 200))
-            renderer.screen.blit(vic_surf, vic_rect)
+            renderer.screen.blit(vic_surf, vic_surf.get_rect(center=(SCREEN_WIDTH//2, 180)))
 
-            info_surf = font_info.render("JATOBÁ ESTÁ A SALVO", True, (255, 255, 255))
-            info_rect = info_surf.get_rect(center=(SCREEN_WIDTH//2, 300))
-            renderer.screen.blit(info_surf, info_rect)
+            score_surf = font_gameover.render(f"SCORE TOTAL: {player.score}", True, (255, 255, 0))
+            renderer.screen.blit(score_surf, score_surf.get_rect(center=(SCREEN_WIDTH//2, 300)))
             
-            esc_surf = font_sign.render("PRESSIONE ESC PARA MENU", True, (150, 150, 200))
-            esc_rect = esc_surf.get_rect(center=(SCREEN_WIDTH//2, 450))
-            renderer.screen.blit(esc_surf, esc_rect)
+            # --- LÓGICA DINÂMICA NA VITÓRIA TAMBÉM ---
+            if player.score > 0:
+                msg = "PRESSIONE ENTER PARA REGISTRAR"
+            else:
+                msg = "PRESSIONE ENTER PARA MENU" # Difícil ganhar com 0, mas vai que...
             
-            if input_sys.was_key_just_pressed(pygame.K_ESCAPE):
+            esc_surf = font_sign.render(msg, True, (150, 150, 200))
+            renderer.screen.blit(esc_surf, esc_surf.get_rect(center=(SCREEN_WIDTH//2, 450)))
+            
+            if input_sys.was_key_just_pressed(pygame.K_RETURN) or input_sys.was_key_just_pressed(pygame.K_ESCAPE):
+                if player.score > 0 and not input_sys.was_key_just_pressed(pygame.K_ESCAPE):
+                    player_name_input = ""
+                    GAME_STATE = "INPUT_NAME"
+                else:
+                    GAME_STATE = "MENU"
+                    title_screen.reset()
+                
+                renderer.screen.fill((0,0,0)) 
+            
+            renderer.render_step()
+
+        # --- TELA DE INPUT DE NOME ---
+        elif GAME_STATE == "INPUT_NAME":
+            renderer.screen.fill((0, 0, 0))
+            
+            title = font_gameover.render("DIGITE SEU NOME", True, (0, 255, 255))
+            renderer.screen.blit(title, title.get_rect(center=(SCREEN_WIDTH//2, 150)))
+            
+            score_display = font_info.render(f"SCORE: {player.score}", True, (255, 255, 0))
+            renderer.screen.blit(score_display, score_display.get_rect(center=(SCREEN_WIDTH//2, 220)))
+
+            for evt in input_sys.events:
+                if evt.type == pygame.KEYDOWN:
+                    if evt.key == pygame.K_RETURN:
+                        final_name = player_name_input if player_name_input else "UNKNOWN"
+                        hs_manager.save_score(final_name, player.score)
+                        GAME_STATE = "HIGHSCORES"
+                        renderer.screen.fill((0,0,0)) 
+                        
+                    elif evt.key == pygame.K_BACKSPACE:
+                        player_name_input = player_name_input[:-1]
+                        
+                    else:
+                        if len(player_name_input) < 8 and evt.unicode.isalpha():
+                            player_name_input += evt.unicode.upper()
+
+            blink_cursor += 1
+            cursor = "_" if (blink_cursor // 30) % 2 == 0 else " "
+            display_text = " ".join(list(player_name_input)) + cursor
+            input_surf = font_gameover.render(display_text, True, (255, 255, 255))
+            renderer.screen.blit(input_surf, input_surf.get_rect(center=(SCREEN_WIDTH//2, 350)))
+            
+            hint = font_sign.render("(MAX 8 LETRAS - ENTER PARA CONFIRMAR)", True, (100, 100, 100))
+            renderer.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, 500)))
+
+            renderer.render_step()
+
+        # --- TELA DE HIGHSCORES ---
+        elif GAME_STATE == "HIGHSCORES":
+            renderer.screen.fill((10, 10, 20))
+            
+            hs_manager.draw_table(renderer, font_gameover, font_score)
+            
+            if input_sys.was_key_just_pressed(pygame.K_RETURN) or input_sys.was_key_just_pressed(pygame.K_ESCAPE):
                 GAME_STATE = "MENU"
                 title_screen.reset()
-                renderer.screen.fill((0,0,0))
-            
+                renderer.screen.fill((0,0,0)) 
+                
             renderer.render_step()
 
     pygame.quit()
