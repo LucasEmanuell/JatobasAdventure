@@ -9,8 +9,8 @@ def move_towards(current, target, max_delta):
     return current + max_delta if target > current else current - max_delta
 
 class Player(Entity):
-    # CORREÇÃO AQUI: Adicionado max_hp=100
-    def __init__(self, x, y, max_hp=100):
+    # Alterado para aceitar score_multiplier
+    def __init__(self, x, y, max_hp=100, score_multiplier=1.0):
         super().__init__(x, y, width=50, height=100)
         
         # --- FÍSICA ---
@@ -24,9 +24,12 @@ class Player(Entity):
         self.MIN_Y = 430 
         self.MAX_Y = 580 
         
-        # Combate
-        self.max_health = max_hp # Usa o valor passado pelo menu
-        self.health = max_hp     # Inicia com vida cheia
+        # --- COMBATE & SCORE ---
+        self.max_health = max_hp 
+        self.health = max_hp     
+        self.score = 0
+        self.score_multiplier = score_multiplier # Guarda o fator de dificuldade
+        
         self.invincible_timer = 0
         self.is_dead = False
         
@@ -75,7 +78,6 @@ class Player(Entity):
             if self.pos[1] > self.MAX_Y: self.pos[1] = self.MAX_Y
             
             if self.pos[0] < 20: self.pos[0] = 20
-            # Limite maximo horizontal removido aqui, controlado pelo main
             
             if input_x > 0: self.facing_right = True
             elif input_x < 0: self.facing_right = False
@@ -110,6 +112,13 @@ class Player(Entity):
             self.invincible_timer = 1.0
             self.velocity[0] = -200 if self.facing_right else 200
             
+            # --- PENALIDADE ESCALADA ---
+            # No hard perde mais pontos também
+            penalty = int(50 * self.score_multiplier)
+            self.score -= penalty
+            if self.score < 0: self.score = 0
+            # ---------------------------
+            
             if self.health <= 0:
                 self.health = 0
                 self.is_dead = True
@@ -132,6 +141,13 @@ class Player(Entity):
                 
                 enemy.take_damage(35)
                 enemy.pos[0] += 50 if self.facing_right else -50
+                
+                # --- RECOMPENSA ESCALADA ---
+                if enemy.is_dead:
+                    # Base 100 * Multiplicador da dificuldade
+                    points = int(100 * self.score_multiplier)
+                    self.score += points
+                    print(f"Kill! +{points} pts")
 
     def rebuild_model(self):
         self.parts = []
