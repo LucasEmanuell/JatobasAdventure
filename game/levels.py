@@ -29,6 +29,167 @@ class Sign(Entity):
         self.add_part([Vertice(-100, -130), Vertice(100, -130), Vertice(100, -80), Vertice(-100, -80)], (20, 40, 100))
         self.add_part([Vertice(-105, -135), Vertice(105, -135), Vertice(105, -130), Vertice(-105, -130)], (200, 200, 200))
 
+class MetroTrain(Entity):
+    """Trem de metrô moderno no Level 2 com animação otimizada"""
+    def __init__(self, x, y, speed=150, direction=1, level_width=3000):
+        super().__init__(x, y)
+        self.parallax = 0.15  # Parallax para dar profundidade
+        self.speed = speed  # Velocidade do trem (pixels por segundo)
+        self.direction = direction  # 1 = direita, -1 = esquerda
+        self.level_width = level_width  # Largura do level para loop
+        self.initial_x = x  # Posição inicial para reset
+        
+        # Escala do trem
+        self.scale = 1.8
+        
+        # Cores modernas de metrô
+        color_body = (220, 220, 230)      # Cinza claro metálico
+        color_stripe = (200, 50, 50)      # Faixa vermelha
+        color_window = (100, 150, 200)    # Janelas azuladas
+        color_door = (180, 180, 190)      # Portas
+        color_dark = (100, 100, 110)      # Detalhes escuros
+        
+        # Construir geometria apenas uma vez (OTIMIZAÇÃO)
+        self._build_train_geometry(color_body, color_stripe, color_window, color_door, color_dark)
+    
+    def _build_train_geometry(self, color_body, color_stripe, color_window, color_door, color_dark):
+        """Constrói a geometria do trem uma única vez (OTIMIZADO)"""
+        scale = self.scale
+        d = self.direction
+        
+        # === CORPO PRINCIPAL DO METRÔ ===
+        body_left = -250 * scale * d
+        body_right = 250 * scale * d
+        body_top = -60 * scale
+        body_bottom = -10 * scale
+        
+        # Corpo do vagão
+        self.add_part([
+            Vertice(body_left, body_top),
+            Vertice(body_right, body_top),
+            Vertice(body_right, body_bottom),
+            Vertice(body_left, body_bottom)
+        ], color_body)
+        
+        # Teto arredondado
+        roof_height = -70 * scale
+        self.add_part([
+            Vertice(body_left + 10*scale*d, body_top),
+            Vertice(body_right - 10*scale*d, body_top),
+            Vertice(body_right - 20*scale*d, roof_height),
+            Vertice(body_left + 20*scale*d, roof_height)
+        ], (200, 200, 210))
+        
+        # Faixa vermelha característica
+        stripe_y = body_top + 15*scale
+        self.add_part([
+            Vertice(body_left, stripe_y),
+            Vertice(body_right, stripe_y),
+            Vertice(body_right, stripe_y + 6*scale),
+            Vertice(body_left, stripe_y + 6*scale)
+        ], color_stripe)
+        
+        # === JANELAS ===
+        window_positions = [-200, -130, -60, 10, 80, 150, 220]
+        window_width = 50 * scale
+        window_height = 30 * scale
+        window_y_top = body_top + 28*scale
+        
+        for wx in window_positions:
+            wx_scaled = wx * scale * d
+            self.add_part([
+                Vertice(wx_scaled, window_y_top),
+                Vertice(wx_scaled + window_width*d, window_y_top),
+                Vertice(wx_scaled + window_width*d, window_y_top + window_height),
+                Vertice(wx_scaled, window_y_top + window_height)
+            ], color_window)
+        
+        # === PORTAS ===
+        door_positions = [-80, 80]
+        for door_x in door_positions:
+            door_x_scaled = door_x * scale * d
+            door_width = 45 * scale
+            door_height = 45 * scale
+            door_y = body_top + 25*scale
+            
+            # Porta
+            self.add_part([
+                Vertice(door_x_scaled, door_y),
+                Vertice(door_x_scaled + door_width*d, door_y),
+                Vertice(door_x_scaled + door_width*d, door_y + door_height),
+                Vertice(door_x_scaled, door_y + door_height)
+            ], color_door)
+            
+            # Linha divisória da porta
+            mid_x = door_x_scaled + (door_width/2)*d
+            self.add_part([
+                Vertice(mid_x, door_y),
+                Vertice(mid_x + 2*d, door_y),
+                Vertice(mid_x + 2*d, door_y + door_height),
+                Vertice(mid_x, door_y + door_height)
+            ], color_dark)
+        
+        # === PARTE FRONTAL (nariz do metrô) ===
+        if d > 0:  # Indo para direita
+            nose_x = body_right
+        else:  # Indo para esquerda
+            nose_x = body_left
+        
+        nose_length = 35 * scale
+        
+        # Nariz arredondado
+        self.add_part([
+            Vertice(nose_x, body_top + 8*scale),
+            Vertice(nose_x + nose_length*d, body_top + 15*scale),
+            Vertice(nose_x + nose_length*d, body_bottom - 4*scale),
+            Vertice(nose_x, body_bottom)
+        ], (240, 240, 250))
+        
+        # Farol frontal
+        farol_y = body_top + 25*scale
+        self.add_part([
+            Vertice(nose_x + (nose_length-8)*d, farol_y),
+            Vertice(nose_x + nose_length*d, farol_y),
+            Vertice(nose_x + nose_length*d, farol_y + 8*scale),
+            Vertice(nose_x + (nose_length-8)*d, farol_y + 8*scale)
+        ], (255, 255, 100))
+        
+        # === RODAS/TRILHOS ===
+        wheel_y = body_bottom + 3*scale
+        wheel_positions = [-180, -90, 0, 90, 180]
+        
+        for wheel_x in wheel_positions:
+            wheel_x_scaled = wheel_x * scale * d
+            wheel_size = 6 * scale
+            # Rodas simples
+            self.add_part([
+                Vertice(wheel_x_scaled - wheel_size, wheel_y),
+                Vertice(wheel_x_scaled + wheel_size, wheel_y),
+                Vertice(wheel_x_scaled + wheel_size, wheel_y + wheel_size),
+                Vertice(wheel_x_scaled - wheel_size, wheel_y + wheel_size)
+            ], (40, 40, 40))
+        
+        # Base/chassi
+        self.add_part([
+            Vertice(body_left + 20*scale*d, body_bottom),
+            Vertice(body_right - 20*scale*d, body_bottom),
+            Vertice(body_right - 30*scale*d, body_bottom + 8*scale),
+            Vertice(body_left + 30*scale*d, body_bottom + 8*scale)
+        ], (60, 60, 70))
+    
+    def update(self, dt):
+        """Atualiza apenas a posição do trem (OTIMIZADO - sem reconstruir geometria)"""
+        # Movimenta o trem
+        self.pos[0] += self.speed * self.direction * dt
+        
+        # Sistema de loop: quando o trem sai da tela, volta do outro lado
+        if self.direction > 0:  # Indo para direita
+            if self.pos[0] > self.level_width + 600:  # Margem de 600 pixels
+                self.pos[0] = -600
+        else:  # Indo para esquerda
+            if self.pos[0] < -600:
+                self.pos[0] = self.level_width + 600
+
 class BackgroundTile(EntityTile):
     def __init__(self, tile_x, VIEW_HEIGHT, level_type=1, texture=None):
         super().__init__(tile_x * TILE_WIDTH, 0)
@@ -37,7 +198,7 @@ class BackgroundTile(EntityTile):
         x0, x1 = 0, TILE_WIDTH
         
         if level_type == 1: # ESTRADA (Com Textura de Céu e Montanhas Gradiente)
-            HORIZON_Y = 300
+            HORIZON_Y = 420  # Ajustado para ser rente ao floorTile
             
             # CÉU: Usa textura se houver, senão cor sólida
             if texture:
@@ -52,11 +213,11 @@ class BackgroundTile(EntityTile):
             else:
                 self.add_part([Vertice(x0,0), Vertice(x1,0), Vertice(x1,HORIZON_Y), Vertice(x0,HORIZON_Y)], color=(20, 20, 40)) 
 
-            # MONTANHAS: Com Gradiente 
+            # MONTANHAS: Com Gradiente - Ajustadas para ficarem menores e próximas ao horizonte
             self.add_part([
-                Vertice(x0, HORIZON_Y+80), Vertice(x0+64, HORIZON_Y-40), 
-                Vertice(x0+128, HORIZON_Y+20), Vertice(x0+192, HORIZON_Y-30),
-                Vertice(x1, HORIZON_Y+10), Vertice(x1, VIEW_HEIGHT), Vertice(x0, VIEW_HEIGHT)
+                Vertice(x0, HORIZON_Y-20), Vertice(x0+64, HORIZON_Y-80), 
+                Vertice(x0+128, HORIZON_Y-40), Vertice(x0+192, HORIZON_Y-70),
+                Vertice(x1, HORIZON_Y-30), Vertice(x1, HORIZON_Y), Vertice(x0, HORIZON_Y)
             ], gradient={'top': (60, 70, 90), 'bottom': (30, 35, 50)})
             
         elif level_type == 2: # TREM 
@@ -132,8 +293,18 @@ class GameLevel:
             self.floor_tiles.append(FloorTile(tx, self.level_number))
             
         sign_x = self.width - 250 
-        if self.level_number == 1: self.decorations.append(Sign(sign_x, 500, "ESTAÇÃO DE TREM ->"))
-        elif self.level_number == 2: self.decorations.append(Sign(sign_x, 500, "SAÍDA ->"))
+        if self.level_number == 1: 
+            self.decorations.append(Sign(sign_x, 500, "ESTAÇÃO DE TREM ->"))
+        elif self.level_number == 2: 
+            self.decorations.append(Sign(sign_x, 500, "SAÍDA ->"))
+            # Adicionar trens de metrô ao longo do level 2 com animação otimizada
+            # Posicionando trens rentes ao floorTile (Y=433) com velocidades e direções variadas
+            # Trem 1: Indo para direita, velocidade média
+            self.decorations.append(MetroTrain(800, 433, speed=120, direction=1, level_width=self.width))
+            # Trem 2: Indo para esquerda, velocidade rápida
+            self.decorations.append(MetroTrain(1800, 433, speed=180, direction=-1, level_width=self.width))
+            # Trem 3: Indo para direita, velocidade lenta
+            self.decorations.append(MetroTrain(2600, 433, speed=90, direction=1, level_width=self.width))
         elif self.level_number == 3:
             self.decorations.append(SunEntity(600, 80)) 
             self.decorations.append(House(self.width - 200, 500))
