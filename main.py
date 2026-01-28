@@ -175,6 +175,10 @@ def main():
                 enemies = [e for e in enemies if not e.is_dead]
                 for enemy in enemies:
                     enemy.update(dt, player)
+                
+                # Atualizar decorations animadas (como os trens no level 2)
+                for deco in level.decorations:
+                    deco.update(dt)
             else:
                 # --- GAME OVER LOGIC (ALTERADA) ---
                 if input_sys.was_key_just_pressed(pygame.K_r) or input_sys.was_key_just_pressed(pygame.K_RETURN):
