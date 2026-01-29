@@ -60,9 +60,8 @@ def draw_score(renderer, player, font):
     renderer.screen.blit(text, (SCREEN_WIDTH - 250, 26))
     
 def draw_minimap(renderer, player, level):
-    """Desenha um minimapa mostrando a posição do player e o fim da fase"""
-    import pygame
-    SCREEN_WIDTH = 800
+    """Desenha um minimapa com o player miniaturizado"""
+    # Não precisa importar pygame aqui se já está no topo, mas mal não faz
     
     # Configurações do minimapa
     minimap_width = 250
@@ -75,7 +74,6 @@ def draw_minimap(renderer, player, level):
     bg_color = (20, 20, 30, 100)
     border_color = (100, 100, 150, 120)
     track_color = (50, 50, 70, 150)
-    player_color = (100, 255, 100)
     flag_color = (255, 50, 50)
     
     # Criar surface com transparência
@@ -90,7 +88,7 @@ def draw_minimap(renderer, player, level):
     pygame.draw.line(minimap_surface, track_color, (5, track_y), (minimap_width - 5, track_y), 3)
     
     # Calcular posições no minimapa
-    # Player position (normalizado 0-1, depois mapeado para o minimapa)
+    # Player position (normalizado 0-1)
     player_progress = max(0, min(1, player.pos[0] / level.width))
     player_x = int(5 + player_progress * (minimap_width - 10))
     player_y = track_y
@@ -99,10 +97,28 @@ def draw_minimap(renderer, player, level):
     flag_x = minimap_width - 10
     flag_y = track_y
     
-    # Desenhar ícone do player (círculo com brilho)
-    pygame.draw.circle(minimap_surface, (50, 200, 50), (player_x, player_y), 8)
-    pygame.draw.circle(minimap_surface, player_color, (player_x, player_y), 6)
-    pygame.draw.circle(minimap_surface, (200, 255, 200), (player_x, player_y), 3)
+    # --- DESENHANDO O PLAYER MINIATURIZADO ---
+    mini_scale = 0.15 # Escala (15% do tamanho original)
+    
+    # O objeto 'player' já tem as partes calculadas no update() atual (com animação)
+    # Vamos apenas desenhar essas partes escaladas e transladadas para o minimapa
+    for part in player.parts:
+        points = []
+        for v in part['vertices']:
+            # Transforma do espaço local do player para o espaço do minimap
+            # v.x e v.y são offsets do centro do player
+            px = player_x + (v.x * mini_scale)
+            py = player_y + (v.y * mini_scale)
+            points.append((px, py))
+        
+        # Pega a cor da parte (se for textura, usamos um cinza padrão ou a cor de tint)
+        color = part.get('color', (200, 200, 200))
+        
+        # Desenha o polígono na surface do minimapa
+        if len(points) >= 3:
+            pygame.draw.polygon(minimap_surface, color, points)
+    
+    # -----------------------------------------
     
     # Desenhar bandeira (fim da fase)
     # Mastro

@@ -69,15 +69,18 @@ Todo o movimento no jogo é calculado via Álgebra Linear.
     * **Localização:** `math_utils/matrix.py`.
     * **Aplicação:** O método `render_entity` no `renderer.py` calcula a posição final de cada parte do corpo do personagem (braços girando, corpo movendo) multiplicando os vértices locais pela matriz combinada.
 
-### 5. Transformação de Visualização (Window to Viewport)
-O sistema de câmera que permite o "scrolling" do jogo.
+### 5. Transformação de Visualização (Window to Viewport e Minimapa)
 
-* **Mapeamento Mundo -> Dispositivo:**
-    * **Lógica:** Diferenciamos o **Mundo** (coordenadas do jogo, ex: 4000px de largura) do **Viewport** (tela física, 800x600px). A câmera calcula fatores de escala (`sx`, `sy`) e translação baseados na posição do jogador e no nível de Zoom.
-    * **Fórmula:** $x_{tela} = (x_{mundo} - x_{min\_window}) \cdot s_x + x_{min\_viewport}$
-    * **Localização:** `engine/camera.py` -> Método `world_to_device`.
-    * **Aplicação:** Permite que a câmera siga o jogador e implemente o efeito de Zoom (teclas Z/X).
+* **Câmera Principal (Scrolling e Zoom):**
+* **Lógica:** Diferenciamos o **Mundo** (coordenadas do jogo, ex: 4000px de largura) do **Viewport** (tela física, 800x600px). A câmera calcula fatores de escala (`sx`, `sy`) e translação baseados na posição do jogador.
+* **Fórmula:** 
+* **Localização:** `engine/camera.py` -> Método `world_to_device`.
 
+
+* **Minimapa em Tempo Real:**
+* **Lógica:** Implementamos uma segunda visualização da cena dentro da HUD. Como o personagem é construído por vetores e não imagens estáticas, reutilizamos a geometria do *Player* aplicando uma **Escala Reduzida (0.15x)** e uma translação para o canto superior direito.
+* **Aplicação:** Isso demonstra a flexibilidade do motor gráfico: a mesma entidade é renderizada simultaneamente em dois sistemas de coordenadas diferentes (Mundo e Minimapa) sem perda de definição.
+* **Localização:** `main.py` -> Função `draw_minimap`.
 ### 6. Máquina de Estados e Loop de Jogo
 Gerenciamento do fluxo da aplicação.
 
