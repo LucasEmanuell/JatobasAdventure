@@ -58,6 +58,71 @@ def draw_score(renderer, player, font):
     renderer.screen.blit(shadow, (SCREEN_WIDTH - 248, 28))
     text = font.render(score_text, True, (255, 255, 100))
     renderer.screen.blit(text, (SCREEN_WIDTH - 250, 26))
+    
+def draw_minimap(renderer, player, level):
+    """Desenha um minimapa mostrando a posição do player e o fim da fase"""
+    import pygame
+    SCREEN_WIDTH = 800
+    
+    # Configurações do minimapa
+    minimap_width = 250
+    minimap_height = 40
+    minimap_x = SCREEN_WIDTH - minimap_width - 30
+    minimap_y = 70
+    border_thickness = 2
+    
+    # Cores (com maior transparência)
+    bg_color = (20, 20, 30, 100)
+    border_color = (100, 100, 150, 120)
+    track_color = (50, 50, 70, 150)
+    player_color = (100, 255, 100)
+    flag_color = (255, 50, 50)
+    
+    # Criar surface com transparência
+    minimap_surface = pygame.Surface((minimap_width, minimap_height), pygame.SRCALPHA)
+    
+    # Desenhar fundo
+    pygame.draw.rect(minimap_surface, bg_color, (0, 0, minimap_width, minimap_height))
+    pygame.draw.rect(minimap_surface, border_color, (0, 0, minimap_width, minimap_height), border_thickness)
+    
+    # Desenhar trilha
+    track_y = minimap_height // 2
+    pygame.draw.line(minimap_surface, track_color, (5, track_y), (minimap_width - 5, track_y), 3)
+    
+    # Calcular posições no minimapa
+    # Player position (normalizado 0-1, depois mapeado para o minimapa)
+    player_progress = max(0, min(1, player.pos[0] / level.width))
+    player_x = int(5 + player_progress * (minimap_width - 10))
+    player_y = track_y
+    
+    # Bandeira no final
+    flag_x = minimap_width - 10
+    flag_y = track_y
+    
+    # Desenhar ícone do player (círculo com brilho)
+    pygame.draw.circle(minimap_surface, (50, 200, 50), (player_x, player_y), 8)
+    pygame.draw.circle(minimap_surface, player_color, (player_x, player_y), 6)
+    pygame.draw.circle(minimap_surface, (200, 255, 200), (player_x, player_y), 3)
+    
+    # Desenhar bandeira (fim da fase)
+    # Mastro
+    pygame.draw.line(minimap_surface, (200, 200, 200), (flag_x, flag_y - 12), (flag_x, flag_y + 5), 2)
+    # Bandeira triangular
+    flag_points = [
+        (flag_x, flag_y - 12),
+        (flag_x + 12, flag_y - 7),
+        (flag_x, flag_y - 2)
+    ]
+    pygame.draw.polygon(minimap_surface, flag_color, flag_points)
+    pygame.draw.polygon(minimap_surface, (200, 0, 0), flag_points, 1)
+    
+    # Desenhar marcadores de progresso (checkpoints visuais)
+    for i in range(1, 4):
+        checkpoint_x = int(5 + (i * 0.25) * (minimap_width - 10))
+        pygame.draw.line(minimap_surface, (80, 80, 100, 120), (checkpoint_x, track_y - 5), (checkpoint_x, track_y + 5), 1)
+    
+    # Renderizar na tela
+    renderer.screen.blit(minimap_surface, (minimap_x, minimap_y))
 
 def start_level(level_number, difficulty_hearts, sky_texture, old_player=None):
     level = GameLevel(level_number, SCREEN_HEIGHT, sky_texture=sky_texture)
@@ -96,6 +161,7 @@ def render_game_scene(renderer, camera, level, player, enemies, font_sign, font_
         draw_hearts(renderer, player)
         draw_sign_labels(renderer, camera, level, font_sign)
         draw_score(renderer, player, font_score)
+        draw_minimap(renderer, player, level)
 
 def main():
     pygame.init()
