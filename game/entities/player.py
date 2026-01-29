@@ -96,8 +96,7 @@ class Player(Entity):
             if input_x > 0: self.facing_right = True
             elif input_x < 0: self.facing_right = False
 
-        if (input_handler.is_key_pressed(pygame.K_SPACE) or \
-            input_handler.is_key_pressed(pygame.K_z)) and not self.attacking:
+        if (input_handler.is_key_pressed(pygame.K_SPACE)) and not self.attacking:
             self.start_attack()
 
         if self.attacking:

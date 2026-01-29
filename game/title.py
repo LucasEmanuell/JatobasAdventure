@@ -86,7 +86,7 @@ class TitleScreen:
         self.blink_timer = 0
 
     def draw(self, renderer):
-        if not self.is_drawn:
+        # if not self.is_drawn:
             # Fundo Arcade Novo
             self.draw_arcade_sky(renderer)
             self.draw_arcade_grid(renderer)
@@ -102,7 +102,7 @@ class TitleScreen:
             renderer.draw_primitive_circle(moon_center, 50, (230, 230, 255))
             renderer.apply_flood_fill(moon_center, (255, 255, 255))
             
-            self.is_drawn = True
+            # self.is_drawn = True
 
     def draw_vector_text(self, renderer, text, x, y, size, color, spacing=1.2, thickness=1):
         

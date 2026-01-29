@@ -77,6 +77,26 @@ def start_level(level_number, difficulty_hearts, sky_texture, old_player=None):
     enemies = level.spawn_entities()
     return player, enemies, level
 
+# --- FUNÇÃO AUXILIAR DE RENDERIZAÇÃO (Para usar no GAME e no PAUSE) ---
+def render_game_scene(renderer, camera, level, player, enemies, font_sign, font_score):
+    renderer.screen.fill((0, 0, 0))
+
+    # Desenha Cenário
+    for bg in level.bg_tiles: renderer.render_background(bg, camera)
+    for deco in level.decorations: renderer.render_entity(deco, camera)
+    for fl in level.floor_tiles: renderer.render_entity(fl, camera)
+
+    # Desenha Entidades
+    all_entities = enemies + [player]
+    all_entities.sort(key=lambda e: e.pos[1])
+    for ent in all_entities: renderer.render_entity(ent, camera)
+    
+    # Desenha HUD
+    if not player.is_dead:
+        draw_hearts(renderer, player)
+        draw_sign_labels(renderer, camera, level, font_sign)
+        draw_score(renderer, player, font_score)
+
 def main():
     pygame.init()
     pygame.font.init() 
@@ -129,6 +149,7 @@ def main():
             if input_sys.was_key_just_pressed(pygame.K_RETURN):
                 GAME_STATE = "DIFFICULTY"
                 renderer.screen.fill((0,0,0)) 
+            renderer.screen.fill((0,0,0)) # Limpa o frame anterior
             title_screen.draw(renderer)
             title_screen.draw_dynamic(renderer)
             pygame.display.flip()
@@ -160,10 +181,12 @@ def main():
 
         # --- LOOP DO JOGO ---
         elif GAME_STATE == "GAME":
+            # 1. UPDATE
             if not player.is_dead:
                 player.update(dt, input_sys, enemies)
                 camera.follow(player)
                 
+                # Check Fim de Fase
                 if player.pos[0] > level.width + 100:
                     current_level_num += 1
                     if current_level_num > 3:
@@ -176,21 +199,21 @@ def main():
                 for enemy in enemies:
                     enemy.update(dt, player)
                 
-                # Atualizar decorations animadas (como os trens no level 2)
                 for deco in level.decorations:
                     deco.update(dt)
+                
+                # --- INPUT DE PAUSE ---
+                if input_sys.was_key_just_pressed(pygame.K_ESCAPE):
+                    GAME_STATE = "PAUSE"
             else:
-                # --- GAME OVER LOGIC (ALTERADA) ---
+                # Lógica de Morte (Game Over)
                 if input_sys.was_key_just_pressed(pygame.K_r) or input_sys.was_key_just_pressed(pygame.K_RETURN):
                     if player.score > 0:
-                        # Se tem pontos, deixa salvar
                         player_name_input = "" 
                         GAME_STATE = "INPUT_NAME" 
                     else:
-                        # Se não tem pontos, vai direto pro menu (e limpa título)
                         GAME_STATE = "MENU"
                         title_screen.reset()
-                    
                     renderer.screen.fill((0,0,0)) 
                 
                 if input_sys.was_key_just_pressed(pygame.K_ESCAPE):
@@ -198,24 +221,14 @@ def main():
                     title_screen.reset()
                     renderer.screen.fill((0,0,0)) 
 
+            # Debug Zoom
             if input_sys.is_key_pressed(pygame.K_z): camera.set_zoom(1.5)
             elif input_sys.is_key_pressed(pygame.K_x): camera.set_zoom(1.0)
 
-            renderer.screen.fill((0, 0, 0))
-
-            for bg in level.bg_tiles: renderer.render_background(bg, camera)
-            for deco in level.decorations: renderer.render_entity(deco, camera)
-            for fl in level.floor_tiles: renderer.render_entity(fl, camera)
-
-            all_entities = enemies + [player]
-            all_entities.sort(key=lambda e: e.pos[1])
-            for ent in all_entities: renderer.render_entity(ent, camera)
+            # 2. RENDER (Usando a função auxiliar)
+            render_game_scene(renderer, camera, level, player, enemies, font_sign, font_score)
             
-            if not player.is_dead:
-                draw_hearts(renderer, player)
-                draw_sign_labels(renderer, camera, level, font_sign)
-                draw_score(renderer, player, font_score)
-            
+            # Overlay de Game Over se morto
             if player.is_dead:
                 overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
                 overlay.fill((0, 0, 0, 180))
@@ -228,14 +241,40 @@ def main():
                 final_score_surf = font_info.render(f"SCORE FINAL: {player.score}", True, (255, 255, 100))
                 renderer.screen.blit(final_score_surf, final_score_surf.get_rect(center=(SCREEN_WIDTH//2, 300)))
 
-                # --- TEXTO DINÂMICO BASEADO NO SCORE ---
-                if player.score > 0:
-                    msg = "PRESSIONE [ENTER] PARA REGISTRAR"
-                else:
-                    msg = "PRESSIONE [ENTER] PARA SAIR"
-                
+                msg = "PRESSIONE [ENTER] PARA REGISTRAR" if player.score > 0 else "PRESSIONE [ENTER] PARA SAIR"
                 cont_surf = font_info.render(msg, True, (200, 200, 200))
                 renderer.screen.blit(cont_surf, cont_surf.get_rect(center=(SCREEN_WIDTH//2, 400)))
+
+            renderer.render_step()
+
+        # --- ESTADO DE PAUSE ---
+        elif GAME_STATE == "PAUSE":
+            # Não faz update(), apenas renderiza a cena estática
+            render_game_scene(renderer, camera, level, player, enemies, font_sign, font_score)
+            
+            # Overlay Escuro
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 150))
+            renderer.screen.blit(overlay, (0,0))
+            
+            # Texto de Pause
+            pause_title = font_gameover.render("JOGO PAUSADO", True, (255, 255, 255))
+            renderer.screen.blit(pause_title, pause_title.get_rect(center=(SCREEN_WIDTH//2, 200)))
+            
+            resume_surf = font_info.render("PRESSIONE [ENTER] PARA CONTINUAR", True, (100, 255, 100))
+            renderer.screen.blit(resume_surf, resume_surf.get_rect(center=(SCREEN_WIDTH//2, 300)))
+            
+            quit_surf = font_info.render("PRESSIONE [Q] PARA SAIR AO MENU", True, (255, 100, 100))
+            renderer.screen.blit(quit_surf, quit_surf.get_rect(center=(SCREEN_WIDTH//2, 380)))
+            
+            # Input do Pause
+            if input_sys.was_key_just_pressed(pygame.K_RETURN):
+                GAME_STATE = "GAME"
+            
+            if input_sys.was_key_just_pressed(pygame.K_q):
+                GAME_STATE = "MENU"
+                title_screen.reset()
+                renderer.screen.fill((0,0,0))
 
             renderer.render_step()
 
@@ -249,12 +288,7 @@ def main():
             score_surf = font_gameover.render(f"SCORE TOTAL: {player.score}", True, (255, 255, 0))
             renderer.screen.blit(score_surf, score_surf.get_rect(center=(SCREEN_WIDTH//2, 300)))
             
-            # --- LÓGICA DINÂMICA NA VITÓRIA TAMBÉM ---
-            if player.score > 0:
-                msg = "PRESSIONE ENTER PARA REGISTRAR"
-            else:
-                msg = "PRESSIONE ENTER PARA MENU" # Difícil ganhar com 0, mas vai que...
-            
+            msg = "PRESSIONE ENTER PARA REGISTRAR" if player.score > 0 else "PRESSIONE ENTER PARA MENU"
             esc_surf = font_sign.render(msg, True, (150, 150, 200))
             renderer.screen.blit(esc_surf, esc_surf.get_rect(center=(SCREEN_WIDTH//2, 450)))
             
@@ -265,7 +299,6 @@ def main():
                 else:
                     GAME_STATE = "MENU"
                     title_screen.reset()
-                
                 renderer.screen.fill((0,0,0)) 
             
             renderer.render_step()

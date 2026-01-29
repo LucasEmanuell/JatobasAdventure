@@ -12,9 +12,8 @@ class InputHandler:
         self.keys = pygame.key.get_pressed()
         self.events = pygame.event.get()
         
-        # --- CORREÇÃO: Atualiza posição do mouse sempre ---
+        # Atualiza posição do mouse sempre
         self.mouse_pos = pygame.mouse.get_pos()
-        # --------------------------------------------------
         
         for event in self.events:
             if event.type == pygame.QUIT:
