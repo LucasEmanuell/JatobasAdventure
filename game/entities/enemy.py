@@ -24,7 +24,7 @@ class Enemy(Entity):
             self.speed = 160.0
             self.health = 40
             self.attack_range = 50
-            self.damage = 15
+            self.damage = 20
         elif self.enemy_type == "boss": # Chefão da Rua
             self.speed = 85.0
             self.health = 200
