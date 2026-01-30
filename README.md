@@ -1,4 +1,3 @@
-
 # Jatobá's Adventure
 
 ![Project Banner](tela_inicial.png) 
@@ -9,7 +8,10 @@
 **Computação Gráfica - Primeiro Trabalho**   
 **Professor: Matheus Araújo** 
 
+Vídeo-Apresentação: [- YouTube](https://www.youtube.com/watch?v=-r4CbDQ3zCI)
+
 ### 👥 Membros da Equipe
+
 * **Eduardo Matias** 
 * **Lucas Emanuel** 
 * **Murilo Sousa**
@@ -29,64 +31,79 @@ O projeto apresenta um motor gráfico capaz de renderizar primitivas, polígonos
 Abaixo detalhamos como os conceitos teóricos de Computação Gráfica foram aplicados na arquitetura do projeto.
 
 ### 1. Algoritmos de Rasterização (Primitivas)
+
 Implementação de algoritmos para converter formas geométricas matemáticas em pixels na tela.
 
 * **Retas (Bresenham):**
-    * **Lógica:** Utilizamos uma variação do algoritmo de Bresenham/DDA para traçar linhas. O algoritmo calcula o diferencial (`dx`, `dy`) e incrementa pixel a pixel baseado no erro acumulado, evitando o uso intensivo de divisões de ponto flutuante.
-    * **Localização:** `core/algorithms.py` -> Função `draw_line`.
-    * **Aplicação:** Usado para desenhar as linhas de contorno, a grade "Cyberpunk" do menu e os vetores da fonte de texto.
+  
+  * **Lógica:** Utilizamos uma variação do algoritmo de Bresenham/DDA para traçar linhas. O algoritmo calcula o diferencial (`dx`, `dy`) e incrementa pixel a pixel baseado no erro acumulado, evitando o uso intensivo de divisões de ponto flutuante.
+  * **Localização:** `core/algorithms.py` -> Função `draw_line`.
+  * **Aplicação:** Usado para desenhar as linhas de contorno, a grade "Cyberpunk" do menu e os vetores da fonte de texto.
 
 * **Círculos e Elipses:**
-    * **Lógica:** Utiliza a simetria de 4 quadrantes. Calcula-se os pontos de um arco e espelha-se para os outros quadrantes.
-    * **Localização:** `core/algorithms.py` -> Função `draw_ellipse`.
-    * **Aplicação:** Renderização da Lua na tela de título e sombras/poças no chão.
+  
+  * **Lógica:** Utiliza a simetria de 4 quadrantes. Calcula-se os pontos de um arco e espelha-se para os outros quadrantes.
+  * **Localização:** `core/algorithms.py` -> Função `draw_ellipse`.
+  * **Aplicação:** Renderização da Lua na tela de título e sombras/poças no chão.
 
 ### 2. Preenchimento de Polígonos (Scanline)
 
 * **Scanline Fill:**
-    * **Lógica:** O algoritmo ordena as arestas do polígono, varre a tela linha por linha (scanlines), calcula as interseções das arestas ativas com a linha atual e preenche os pixels entre pares de interseções.
-    * **Localização:** `core/rasterizer.py` -> Função `scanline_fill`.
-    * **Aplicação:** Preenchimento de todas as entidades (Player, Inimigos, Chão) que não possuem textura.
+  
+  * **Lógica:** O algoritmo ordena as arestas do polígono, varre a tela linha por linha (scanlines), calcula as interseções das arestas ativas com a linha atual e preenche os pixels entre pares de interseções.
+  * **Localização:** `core/rasterizer.py` -> Função `scanline_fill`.
+  * **Aplicação:** Preenchimento de todas as entidades (Player, Inimigos, Chão) que não possuem textura.
 
 * **Interpolação (Gouraud/Textura):**
-    * **Lógica:** Durante a varredura do Scanline, interpolamos valores além da posição X. Para texturas, interpolamos coordenadas `(u, v)`. Para gradientes, interpolamos valores `(r, g, b)` entre o topo e a base do polígono.
-    * **Localização:** `core/rasterizer.py` -> Funções `scanline_texture` e `scanline_fill_gradiente`.
-    * **Aplicação:** Prédios texturizados, montanhas com degradê e céu da primeira fase.
+  
+  * **Lógica:** Durante a varredura do Scanline, interpolamos valores além da posição X. Para texturas, interpolamos coordenadas `(u, v)`. Para gradientes, interpolamos valores `(r, g, b)` entre o topo e a base do polígono.
+  * **Localização:** `core/rasterizer.py` -> Funções `scanline_texture` e `scanline_fill_gradiente`.
+  * **Aplicação:** Prédios texturizados, montanhas com degradê e céu da primeira fase.
 
 ### 3. Recorte (Clipping)
+
 Para otimizar a renderização e evitar erros de desenho fora da memória de vídeo.
 
 * **Cohen-Sutherland:**
-    * **Lógica:** O espaço é dividido em 9 regiões usando códigos binários (Bitcodes: Top, Bottom, Left, Right). Linhas totalmente dentro são aceitas; totalmente fora são rejeitadas. Linhas que cruzam a borda são cortadas matematicamente na interseção com a janela de visualização.
-    * **Localização:** `core/clipping.py` (Algoritmo) e `core/renderer.py` (Aplicação em `draw_primitive_line`).
-    * **Aplicação:** Garante que linhas da grade ou da interface não "estourem" a tela ou causem crash.
+  * **Lógica:** O espaço é dividido em 9 regiões usando códigos binários (Bitcodes: Top, Bottom, Left, Right). Linhas totalmente dentro são aceitas; totalmente fora são rejeitadas. Linhas que cruzam a borda são cortadas matematicamente na interseção com a janela de visualização.
+  * **Localização:** `core/clipping.py` (Algoritmo) e `core/renderer.py` (Aplicação em `draw_primitive_line`).
+  * **Aplicação:** Garante que linhas da grade ou da interface não "estourem" a tela ou causem crash.
 
 ### 4. Transformações Geométricas e Matrizes
+
 Todo o movimento no jogo é calculado via Álgebra Linear.
 
 * **Matrizes de Transformação:**
-    * **Lógica:** Uso de Coordenadas Homogêneas (Matrizes 3x3 para 2D). As operações de **Translação**, **Rotação** e **Escala** são combinadas em uma única "Matriz Modelo" através da multiplicação de matrizes.
-    * **Localização:** `math_utils/matrix.py`.
-    * **Aplicação:** O método `render_entity` no `renderer.py` calcula a posição final de cada parte do corpo do personagem (braços girando, corpo movendo) multiplicando os vértices locais pela matriz combinada.
+  * **Lógica:** Uso de Coordenadas Homogêneas (Matrizes 3x3 para 2D). As operações de **Translação**, **Rotação** e **Escala** são combinadas em uma única "Matriz Modelo" através da multiplicação de matrizes.
+  * **Localização:** `math_utils/matrix.py`.
+  * **Aplicação:** O método `render_entity` no `renderer.py` calcula a posição final de cada parte do corpo do personagem (braços girando, corpo movendo) multiplicando os vértices locais pela matriz combinada.
 
 ### 5. Transformação de Visualização (Window to Viewport e Minimapa)
 
 * **Câmera Principal (Scrolling e Zoom):**
+
 * **Lógica:** Diferenciamos o **Mundo** (coordenadas do jogo, ex: 4000px de largura) do **Viewport** (tela física, 800x600px). A câmera calcula fatores de escala (`sx`, `sy`) e translação baseados na posição do jogador.
+
 * **Fórmula:** 
+
 * **Localização:** `engine/camera.py` -> Método `world_to_device`.
 
-
 * **Minimapa em Tempo Real:**
+
 * **Lógica:** Implementamos uma segunda visualização da cena dentro da HUD. Como o personagem é construído por vetores e não imagens estáticas, reutilizamos a geometria do *Player* aplicando uma **Escala Reduzida (0.15x)** e uma translação para o canto superior direito.
+
 * **Aplicação:** Isso demonstra a flexibilidade do motor gráfico: a mesma entidade é renderizada simultaneamente em dois sistemas de coordenadas diferentes (Mundo e Minimapa) sem perda de definição.
+
 * **Localização:** `main.py` -> Função `draw_minimap`.
-### 6. Máquina de Estados e Loop de Jogo
-Gerenciamento do fluxo da aplicação.
+  
+  ### 6. Máquina de Estados e Loop de Jogo
+  
+  Gerenciamento do fluxo da aplicação.
 
 * **Game Loop & Pause:**
-    * **Lógica:** O loop principal desacopla a atualização lógica (`update`) da renderização (`draw`). Isso permitiu a implementação do sistema de **Pause**, onde o jogo para de atualizar a física (`dt` não é processado), mas continua desenhando a cena congelada com um overlay semitransparente.
-    * **Localização:** `main.py` (Estrutura `while running`).
+  
+  * **Lógica:** O loop principal desacopla a atualização lógica (`update`) da renderização (`draw`). Isso permitiu a implementação do sistema de **Pause**, onde o jogo para de atualizar a física (`dt` não é processado), mas continua desenhando a cena congelada com um overlay semitransparente.
+  * **Localização:** `main.py` (Estrutura `while running`).
 
 ---
 
@@ -115,7 +132,6 @@ Gerenciamento do fluxo da aplicação.
 |   +-- vector.py         # Operações Vetoriais
 +-- main.py               # Ponto de entrada e Game Loop
 +-- scores.json           # Banco de dados local de pontuação
-
 ```
 
 ---
@@ -130,34 +146,32 @@ Gerenciamento do fluxo da aplicação.
 ### Instalação
 
 1. Clone o repositório ou extraia os arquivos.
+
 2. Instale as dependências:
-```bash
-pip install pygame numpy
+   
+   ```bash
+   pip install pygame numpy
+   ```
 
 ```
-
-
 3. Execute o jogo:
 ```bash
 python main.py
-
 ```
-
-
 
 ---
 
 ## 🕹️ Controles
 
-| Tecla | Ação |
-| --- | --- |
-| **W, A, S, D** | Mover o personagem |
-| **Espaço** | Atacar |
-| **Esc** | Pausar o Jogo |
-| **Q** | Sair para o Menu |
-| **Enter** | Confirmar / Continuar |
-| **Mouse** | Selecionar opções |
-| **Z / X** | Zoom In / Zoom Out |
+| Tecla          | Ação                  |
+| -------------- | --------------------- |
+| **W, A, S, D** | Mover o personagem    |
+| **Espaço**     | Atacar                |
+| **Esc**        | Pausar o Jogo         |
+| **Q**          | Sair para o Menu      |
+| **Enter**      | Confirmar / Continuar |
+| **Mouse**      | Selecionar opções     |
+| **Z / X**      | Zoom In / Zoom Out    |
 
 ---
 
