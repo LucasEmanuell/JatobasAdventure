@@ -78,27 +78,30 @@ Todo o movimento no jogo é calculado via Álgebra Linear.
   * **Localização:** `math_utils/matrix.py`.
   * **Aplicação:** O método `render_entity` no `renderer.py` calcula a posição final de cada parte do corpo do personagem (braços girando, corpo movendo) multiplicando os vértices locais pela matriz combinada.
 
-### 5. Transformação de Visualização (Window to Viewport e Minimapa)
+### 5. Transformação de Visualização (Window to Viewport via Matrizes)
 
-* **Câmera Principal (Scrolling e Zoom):**
+Implementação formal do pipeline de visualização baseado em Álgebra Linear, conforme fundamentação teórica da disciplina.
 
-* **Lógica:** Diferenciamos o **Mundo** (coordenadas do jogo, ex: 4000px de largura) do **Viewport** (tela física, 800x600px). A câmera calcula fatores de escala (`sx`, `sy`) e translação baseados na posição do jogador.
+* **Fundamentação Teórica ():**
+* **Lógica:** Abandonamos a abordagem algébrica simples para adotar a **Composição de Matrizes**. A classe `Camera` gera uma matriz de transformação  que é o produto de três operações:
+1. : Translada a janela do mundo para a origem.
+2. : Aplica a escala para normalizar as dimensões (Zoom).
+3. : Translada para a posição do Viewport na tela.
 
-* **Fórmula:** 
 
-* **Localização:** `engine/camera.py` -> Método `world_to_device`.
+* **Aplicação:** Todos os vértices do jogo são multiplicados por essa matriz  antes da rasterização.
+* **Localização:** `engine/camera.py` -> Método `_update_transformation_matrix`.
 
-* **Minimapa em Tempo Real:**
 
-* **Lógica:** Implementamos uma segunda visualização da cena dentro da HUD. Como o personagem é construído por vetores e não imagens estáticas, reutilizamos a geometria do *Player* aplicando uma **Escala Reduzida (0.15x)** e uma translação para o canto superior direito.
+* **Múltiplas Viewports (Minimapa Matricial):**
+* **Lógica:** Para demonstrar a robustez do sistema, o **Minimapa** não é um desenho estático, mas sim o resultado de uma **segunda instância da classe Camera** (`mini_camera`).
+* **Funcionamento:** Enquanto a câmera principal mapeia uma pequena janela móvel para a tela cheia, a câmera do minimapa mapeia **todo o nível (0 a 4000px)** para um **pequeno viewport (250x40px)**.
+* **Resultado:** O jogador desenhado no minimapa é a renderização dos mesmos vetores do jogo original, porém submetidos a uma matriz de escala severa, provando que o motor vetorial mantém a consistência geométrica em qualquer resolução.
 
-* **Aplicação:** Isso demonstra a flexibilidade do motor gráfico: a mesma entidade é renderizada simultaneamente em dois sistemas de coordenadas diferentes (Mundo e Minimapa) sem perda de definição.
 
-* **Localização:** `main.py` -> Função `draw_minimap`.
-  
-  ### 6. Máquina de Estados e Loop de Jogo
-  
-  Gerenciamento do fluxo da aplicação.
+
+### 6. Máquina de Estados e Loop de Jogo
+Gerenciamento do fluxo da aplicação.
 
 * **Game Loop & Pause:**
   

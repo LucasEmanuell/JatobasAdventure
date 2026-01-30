@@ -18,6 +18,12 @@ SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 LEVEL_WIDTH = 4000
 
+# Configurações do Minimapa (Viewport Secundário)
+MINIMAP_W = 250
+MINIMAP_H = 40
+MINIMAP_X = SCREEN_WIDTH - MINIMAP_W - 30
+MINIMAP_Y = 70
+
 def draw_sign_labels(renderer, camera, level, font):
     for deco in level.decorations:
         if isinstance(deco, Sign):
@@ -59,86 +65,66 @@ def draw_score(renderer, player, font):
     text = font.render(score_text, True, (255, 255, 100))
     renderer.screen.blit(text, (SCREEN_WIDTH - 250, 26))
     
-def draw_minimap(renderer, player, level):
-    """Desenha um minimapa com o player miniaturizado"""
-    # Não precisa importar pygame aqui se já está no topo, mas mal não faz
+def draw_minimap(renderer, player, level, mini_camera):
+    """
+    Desenha o minimapa usando uma Segunda Câmera (Matriz de Transformação).
+    Isso prova a reutilização da lógica de Window-to-Viewport.
+    """
     
-    # Configurações do minimapa
-    minimap_width = 250
-    minimap_height = 40
-    minimap_x = SCREEN_WIDTH - minimap_width - 30
-    minimap_y = 70
-    border_thickness = 2
-    
-    # Cores (com maior transparência)
+    # 1. DESENHO DO FUNDO E HUD 
+    # Cores
     bg_color = (20, 20, 30, 100)
     border_color = (100, 100, 150, 120)
     track_color = (50, 50, 70, 150)
     flag_color = (255, 50, 50)
     
-    # Criar surface com transparência
-    minimap_surface = pygame.Surface((minimap_width, minimap_height), pygame.SRCALPHA)
+    # Surface transparente para o minimapa
+    minimap_surface = pygame.Surface((MINIMAP_W, MINIMAP_H), pygame.SRCALPHA)
     
-    # Desenhar fundo
-    pygame.draw.rect(minimap_surface, bg_color, (0, 0, minimap_width, minimap_height))
-    pygame.draw.rect(minimap_surface, border_color, (0, 0, minimap_width, minimap_height), border_thickness)
+    # Fundo e Borda
+    pygame.draw.rect(minimap_surface, bg_color, (0, 0, MINIMAP_W, MINIMAP_H))
+    pygame.draw.rect(minimap_surface, border_color, (0, 0, MINIMAP_W, MINIMAP_H), 2)
     
-    # Desenhar trilha
-    track_y = minimap_height // 2
-    pygame.draw.line(minimap_surface, track_color, (5, track_y), (minimap_width - 5, track_y), 3)
-    
-    # Calcular posições no minimapa
-    # Player position (normalizado 0-1)
-    player_progress = max(0, min(1, player.pos[0] / level.width))
-    player_x = int(5 + player_progress * (minimap_width - 10))
-    player_y = track_y
+    # Linha do trilho (chão)
+    track_y = MINIMAP_H // 2 + 10
+    pygame.draw.line(minimap_surface, track_color, (5, track_y), (MINIMAP_W - 5, track_y), 3)
     
     # Bandeira no final
-    flag_x = minimap_width - 10
+    flag_x = MINIMAP_W - 10
     flag_y = track_y
+    pygame.draw.line(minimap_surface, (200, 200, 200), (flag_x, flag_y - 12), (flag_x, flag_y + 5), 2)
+    flag_points = [(flag_x, flag_y - 12), (flag_x + 12, flag_y - 7), (flag_x, flag_y - 2)]
+    pygame.draw.polygon(minimap_surface, flag_color, flag_points)
     
-    # --- DESENHANDO O PLAYER MINIATURIZADO ---
-    mini_scale = 0.15 # Escala (15% do tamanho original)
+    # Renderiza a base do minimapa na tela principal
+    renderer.screen.blit(minimap_surface, (MINIMAP_X, MINIMAP_Y))
     
-    # O objeto 'player' já tem as partes calculadas no update() atual (com animação)
-    # Vamos apenas desenhar essas partes escaladas e transladadas para o minimapa
+    # 2. DESENHO DO PLAYER
+    # Usamos mini_camera.world_to_device()
+    
     for part in player.parts:
         points = []
         for v in part['vertices']:
-            # Transforma do espaço local do player para o espaço do minimap
-            # v.x e v.y são offsets do centro do player
-            px = player_x + (v.x * mini_scale)
-            py = player_y + (v.y * mini_scale)
-            points.append((px, py))
+            # Transforma o vértice local do player para coordenadas do mundo
+            # (O player é definido relativo ao centro dele, então somamos a posição)
+            world_x = player.pos[0] + v.x
+            world_y = player.pos[1] + v.y
+            
+            # Pede para a Câmera do Minimapa converter Mundo -> Viewport do Minimapa
+            v_screen = mini_camera.world_to_device(Vertice(world_x, world_y))
+            
+            # O resultado v_screen está em coordenadas relativas ao viewport (0..250)
+            # Precisamos somar o offset de onde o minimapa está na tela global
+            final_x = v_screen.x + MINIMAP_X
+            final_y = v_screen.y + MINIMAP_Y 
+            
+            points.append((final_x, final_y))
         
-        # Pega a cor da parte (se for textura, usamos um cinza padrão ou a cor de tint)
+        # Desenha o polígono transformado
         color = part.get('color', (200, 200, 200))
-        
-        # Desenha o polígono na surface do minimapa
         if len(points) >= 3:
-            pygame.draw.polygon(minimap_surface, color, points)
-    
-    # -----------------------------------------
-    
-    # Desenhar bandeira (fim da fase)
-    # Mastro
-    pygame.draw.line(minimap_surface, (200, 200, 200), (flag_x, flag_y - 12), (flag_x, flag_y + 5), 2)
-    # Bandeira triangular
-    flag_points = [
-        (flag_x, flag_y - 12),
-        (flag_x + 12, flag_y - 7),
-        (flag_x, flag_y - 2)
-    ]
-    pygame.draw.polygon(minimap_surface, flag_color, flag_points)
-    pygame.draw.polygon(minimap_surface, (200, 0, 0), flag_points, 1)
-    
-    # Desenhar marcadores de progresso (checkpoints visuais)
-    for i in range(1, 4):
-        checkpoint_x = int(5 + (i * 0.25) * (minimap_width - 10))
-        pygame.draw.line(minimap_surface, (80, 80, 100, 120), (checkpoint_x, track_y - 5), (checkpoint_x, track_y + 5), 1)
-    
-    # Renderizar na tela
-    renderer.screen.blit(minimap_surface, (minimap_x, minimap_y))
+            # Desenhamos direto na tela do renderer para não perder qualidade alpha
+            pygame.draw.polygon(renderer.screen, color, points)
 
 def start_level(level_number, difficulty_hearts, sky_texture, old_player=None):
     level = GameLevel(level_number, SCREEN_HEIGHT, sky_texture=sky_texture)
@@ -158,26 +144,24 @@ def start_level(level_number, difficulty_hearts, sky_texture, old_player=None):
     enemies = level.spawn_entities()
     return player, enemies, level
 
-# --- FUNÇÃO AUXILIAR DE RENDERIZAÇÃO (Para usar no GAME e no PAUSE) ---
-def render_game_scene(renderer, camera, level, player, enemies, font_sign, font_score):
+# Atualizado para receber mini_camera
+def render_game_scene(renderer, camera, mini_camera, level, player, enemies, font_sign, font_score):
     renderer.screen.fill((0, 0, 0))
 
-    # Desenha Cenário
     for bg in level.bg_tiles: renderer.render_background(bg, camera)
     for deco in level.decorations: renderer.render_entity(deco, camera)
     for fl in level.floor_tiles: renderer.render_entity(fl, camera)
 
-    # Desenha Entidades
     all_entities = enemies + [player]
     all_entities.sort(key=lambda e: e.pos[1])
     for ent in all_entities: renderer.render_entity(ent, camera)
     
-    # Desenha HUD
     if not player.is_dead:
         draw_hearts(renderer, player)
         draw_sign_labels(renderer, camera, level, font_sign)
         draw_score(renderer, player, font_score)
-        draw_minimap(renderer, player, level)
+        # Passamos a mini_camera aqui
+        draw_minimap(renderer, player, level, mini_camera)
 
 def main():
     pygame.init()
@@ -195,26 +179,32 @@ def main():
         font_score = pygame.font.Font(None, 35)
 
     renderer = Renderer(SCREEN_WIDTH, SCREEN_HEIGHT)
-    camera = Camera(LEVEL_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT)
     input_sys = InputHandler()
     clock = pygame.time.Clock()
     
     assets_loader = AssetsLoader()
     sky_texture = assets_loader.load_texture("assets/textures/sky.png")
     
+    # --- CÂMERA PRINCIPAL ---
+    # Janela: Móvel (define no update) | Viewport: Tela Inteira (800x600)
+    camera = Camera(LEVEL_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT)
+    
+    # --- CÂMERA DO MINIMAPA (NOVA!) ---
+    # Janela: O Level INTEIRO (0..4000) | Viewport: Tamanho do Minimapa (250x40)
+    # Isso cria uma matriz de escala que reduz tudo para caber no minimapa
+    mini_camera = Camera(LEVEL_WIDTH, SCREEN_HEIGHT, MINIMAP_W, MINIMAP_H)
+    
     title_screen = TitleScreen(SCREEN_WIDTH, SCREEN_HEIGHT)
     difficulty_screen = DifficultyScreen(SCREEN_WIDTH, SCREEN_HEIGHT)
     hs_manager = HighScoreManager("scores.json")
     
     GAME_STATE = "MENU"
-    
     current_level_num = 1
     current_difficulty_hearts = 5 
     
     player = None
     enemies = []
     level = None
-    
     player_name_input = ""
     blink_cursor = 0
 
@@ -223,20 +213,17 @@ def main():
     while running:
         dt = clock.tick(60) / 1000.0 
         if dt > 0.05: dt = 0.05
-
         running = input_sys.update()
         
-        # --- MENU PRINCIPAL ---
         if GAME_STATE == "MENU":
             if input_sys.was_key_just_pressed(pygame.K_RETURN):
                 GAME_STATE = "DIFFICULTY"
                 renderer.screen.fill((0,0,0)) 
-            renderer.screen.fill((0,0,0)) # Limpa o frame anterior
+            renderer.screen.fill((0,0,0)) 
             title_screen.draw(renderer)
             title_screen.draw_dynamic(renderer)
             pygame.display.flip()
 
-        # --- SELEÇÃO DE DIFICULDADE ---
         elif GAME_STATE == "DIFFICULTY":
             renderer.screen.fill((0,0,0))
             confirm_selection = False
@@ -254,21 +241,23 @@ def main():
                 current_difficulty_hearts = difficulty_screen.get_selected_hearts()
                 current_level_num = 1 
                 player, enemies, level = start_level(current_level_num, current_difficulty_hearts, sky_texture)
+                
+                # Reseta câmeras para o novo level (importante se a largura do level mudar)
                 camera = Camera(level.width, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT)
+                # O minimapa precisa saber que o "Mundo" mudou de tamanho
+                mini_camera = Camera(level.width, SCREEN_HEIGHT, MINIMAP_W, MINIMAP_H)
+                
                 GAME_STATE = "GAME"
                 renderer.screen.fill((0,0,0))
             
             difficulty_screen.draw(renderer)
             renderer.render_step()
 
-        # --- LOOP DO JOGO ---
         elif GAME_STATE == "GAME":
-            # 1. UPDATE
             if not player.is_dead:
                 player.update(dt, input_sys, enemies)
                 camera.follow(player)
                 
-                # Check Fim de Fase
                 if player.pos[0] > level.width + 100:
                     current_level_num += 1
                     if current_level_num > 3:
@@ -276,6 +265,7 @@ def main():
                     else:
                         player, enemies, level = start_level(current_level_num, current_difficulty_hearts, sky_texture, player)
                         camera = Camera(level.width, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT)
+                        mini_camera = Camera(level.width, SCREEN_HEIGHT, MINIMAP_W, MINIMAP_H)
 
                 enemies = [e for e in enemies if not e.is_dead]
                 for enemy in enemies:
@@ -284,11 +274,9 @@ def main():
                 for deco in level.decorations:
                     deco.update(dt)
                 
-                # --- INPUT DE PAUSE ---
                 if input_sys.was_key_just_pressed(pygame.K_ESCAPE):
                     GAME_STATE = "PAUSE"
             else:
-                # Lógica de Morte (Game Over)
                 if input_sys.was_key_just_pressed(pygame.K_r) or input_sys.was_key_just_pressed(pygame.K_RETURN):
                     if player.score > 0:
                         player_name_input = "" 
@@ -303,14 +291,12 @@ def main():
                     title_screen.reset()
                     renderer.screen.fill((0,0,0)) 
 
-            # Debug Zoom
             if input_sys.is_key_pressed(pygame.K_z): camera.set_zoom(1.5)
             elif input_sys.is_key_pressed(pygame.K_x): camera.set_zoom(1.0)
 
-            # 2. RENDER (Usando a função auxiliar)
-            render_game_scene(renderer, camera, level, player, enemies, font_sign, font_score)
+            # Passa a mini_camera aqui
+            render_game_scene(renderer, camera, mini_camera, level, player, enemies, font_sign, font_score)
             
-            # Overlay de Game Over se morto
             if player.is_dead:
                 overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
                 overlay.fill((0, 0, 0, 180))
@@ -329,17 +315,13 @@ def main():
 
             renderer.render_step()
 
-        # --- ESTADO DE PAUSE ---
         elif GAME_STATE == "PAUSE":
-            # Não faz update(), apenas renderiza a cena estática
-            render_game_scene(renderer, camera, level, player, enemies, font_sign, font_score)
+            render_game_scene(renderer, camera, mini_camera, level, player, enemies, font_sign, font_score)
             
-            # Overlay Escuro
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 150))
             renderer.screen.blit(overlay, (0,0))
             
-            # Texto de Pause
             pause_title = font_gameover.render("JOGO PAUSADO", True, (255, 255, 255))
             renderer.screen.blit(pause_title, pause_title.get_rect(center=(SCREEN_WIDTH//2, 200)))
             
@@ -349,7 +331,6 @@ def main():
             quit_surf = font_info.render("PRESSIONE [Q] PARA SAIR AO MENU", True, (255, 100, 100))
             renderer.screen.blit(quit_surf, quit_surf.get_rect(center=(SCREEN_WIDTH//2, 380)))
             
-            # Input do Pause
             if input_sys.was_key_just_pressed(pygame.K_RETURN):
                 GAME_STATE = "GAME"
             
@@ -360,7 +341,6 @@ def main():
 
             renderer.render_step()
 
-        # --- TELA DE VITÓRIA ---
         elif GAME_STATE == "VICTORY":
             renderer.screen.fill((20, 20, 50))
             
@@ -385,13 +365,10 @@ def main():
             
             renderer.render_step()
 
-        # --- TELA DE INPUT DE NOME ---
         elif GAME_STATE == "INPUT_NAME":
             renderer.screen.fill((0, 0, 0))
-            
             title = font_gameover.render("DIGITE SEU NOME", True, (0, 255, 255))
             renderer.screen.blit(title, title.get_rect(center=(SCREEN_WIDTH//2, 150)))
-            
             score_display = font_info.render(f"SCORE: {player.score}", True, (255, 255, 0))
             renderer.screen.blit(score_display, score_display.get_rect(center=(SCREEN_WIDTH//2, 220)))
 
@@ -402,10 +379,8 @@ def main():
                         hs_manager.save_score(final_name, player.score)
                         GAME_STATE = "HIGHSCORES"
                         renderer.screen.fill((0,0,0)) 
-                        
                     elif evt.key == pygame.K_BACKSPACE:
                         player_name_input = player_name_input[:-1]
-                        
                     else:
                         if len(player_name_input) < 8 and evt.unicode.isalpha():
                             player_name_input += evt.unicode.upper()
@@ -415,23 +390,17 @@ def main():
             display_text = " ".join(list(player_name_input)) + cursor
             input_surf = font_gameover.render(display_text, True, (255, 255, 255))
             renderer.screen.blit(input_surf, input_surf.get_rect(center=(SCREEN_WIDTH//2, 350)))
-            
             hint = font_sign.render("(MAX 8 LETRAS - ENTER PARA CONFIRMAR)", True, (100, 100, 100))
             renderer.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, 500)))
-
             renderer.render_step()
 
-        # --- TELA DE HIGHSCORES ---
         elif GAME_STATE == "HIGHSCORES":
             renderer.screen.fill((10, 10, 20))
-            
             hs_manager.draw_table(renderer, font_gameover, font_score)
-            
             if input_sys.was_key_just_pressed(pygame.K_RETURN) or input_sys.was_key_just_pressed(pygame.K_ESCAPE):
                 GAME_STATE = "MENU"
                 title_screen.reset()
                 renderer.screen.fill((0,0,0)) 
-                
             renderer.render_step()
 
     pygame.quit()
