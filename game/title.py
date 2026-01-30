@@ -100,7 +100,7 @@ class TitleScreen:
             # Lua
             moon_center = Vertice(680, 80)
             renderer.draw_primitive_circle(moon_center, 50, (230, 230, 255))
-            renderer.apply_flood_fill(moon_center, (255, 255, 255))
+            renderer.apply_flood_fill(moon_center, (255, 255, 255), (230, 230, 255))
             
             # self.is_drawn = True
 

@@ -74,27 +74,50 @@ def draw_ellipse(renderer, center: Vertice, rx, ry, color):
             d2 += dx - dy + rx**2
 
 
-def flood_fill(renderer, seed: Vertice, fill_color):
+def flood_fill(
+    renderer,
+    seed: Vertice,
+    fill_color,
+    boundary_color,
+    use_nearest_neighbors=True
+):
     x, y = int(seed.x), int(seed.y)
 
-    if x < 0 or x >= renderer.width or y < 0 or y >= renderer.height:
+    if not (0 <= x < renderer.width and 0 <= y < renderer.height):
         return
 
-    target_color = renderer.get_pixel(x, y)
     fill_color = tuple(fill_color)
+    boundary_color = tuple(boundary_color)
 
-    if target_color == fill_color:
-        return
-
+    visited = set()
     stack = [(x, y)]
+
+    # 4-connected (nearest neighbors)
+    neighbors_4 = [(1,0), (-1,0), (0,1), (0,-1)]
+
+    # 8-connected (optional)
+    neighbors_8 = neighbors_4 + [(1,1), (1,-1), (-1,1), (-1,-1)]
+
+    neighbors = neighbors_4 if use_nearest_neighbors else neighbors_8
 
     while stack:
         cx, cy = stack.pop()
 
-        if 0 <= cx < renderer.width and 0 <= cy < renderer.height:
-            if renderer.get_pixel(cx, cy) == target_color:
-                renderer.put_pixel(cx, cy, fill_color)
-                stack.append((cx + 1, cy))
-                stack.append((cx - 1, cy))
-                stack.append((cx, cy + 1))
-                stack.append((cx, cy - 1))
+        if (cx, cy) in visited:
+            continue
+        visited.add((cx, cy))
+
+        if not (0 <= cx < renderer.width and 0 <= cy < renderer.height):
+            continue
+
+        current = renderer.get_pixel(cx, cy)
+
+        # Stop at the moon edge
+        if current == boundary_color or current == fill_color:
+            continue
+
+        renderer.put_pixel(cx, cy, fill_color)
+
+        for dx, dy in neighbors:
+            stack.append((cx + dx, cy + dy))
+

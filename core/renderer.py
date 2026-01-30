@@ -32,8 +32,14 @@ class Renderer:
     def draw_primitive_ellipse(self, center, rx, ry, color):
         draw_ellipse(self, center, rx, ry, color)
         
-    def apply_flood_fill(self, seed_vertice, color):
-        flood_fill(self, seed_vertice, color)
+    def apply_flood_fill(self, seed_vertice, color, boundary_color):
+        flood_fill(
+            self,
+            seed=seed_vertice,
+            fill_color=color,
+            boundary_color=boundary_color,
+            use_nearest_neighbors=True
+        )
     
     def render_texture_polygon(self, vertices, texture):
         Rasterizer.scanline_texture(self.screen, vertices, texture)
